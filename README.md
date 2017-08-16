@@ -1,3 +1,5 @@
+## Cute [![cute](http://euphie.me/svg/cute.version.svg)](http://euphie.me) #
+
 ## Description
 
 A simple proxy server with websocket.
