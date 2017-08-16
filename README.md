@@ -1,3 +1,5 @@
+## Cute [![cute](http://euphie.me/svg/cute.version.svg)](http://euphie.me) #
+
 ## Description
 
 A simple proxy server with websocket.
@@ -14,6 +16,6 @@ make
 
 Command line syntax goes as follows:
 ```
-usage: cute [-l address] [-p port]
-example: cute -l 127.0.0.1 -p 9999
+usage: usage: cute [-l address] [-p port] [-h help] [-d daemon]
+example: cute -l 10.0.0.10 -p 9999 -d
 ```
