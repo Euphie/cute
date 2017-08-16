@@ -7,6 +7,7 @@ A simple proxy server with websocket.
 On Linux compile the software using "make". 
 ```
 make
+./cute 
 ```
 
 ## Basic usage
