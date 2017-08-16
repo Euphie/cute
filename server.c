@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -427,10 +430,34 @@ void __runWithWebsocket(struct cuteServer *server) {
     }
 }
 
+void background() {
+    int pid;
+    int i;
+    if((pid=fork())) {
+        exit(0);
+    } else if(pid< 0) {
+        exit(1);
+    }
+
+    setsid();
+    if((pid=fork())) {
+        exit(0);
+    } else if(pid < 0) {
+        exit(1);
+    }
+    
+    for(i=0;i< NOFILE;++i) {
+        close(i);
+    }
+    
+    chdir("/tmp");
+    umask(0);
+}
+
 void test() {
-    connectToRemote("euphie.me", "80");
-    sleep(20);
-    exit(0);
+    // connectToRemote("euphie.me", "80");
+    // sleep(20);
+    // exit(0);
 }
 
 //#define M_WORKER
@@ -441,7 +468,7 @@ void parseOptions(int argc, char *argv[]) {
     server.addr.sin_family = AF_INET;
     server.addr.sin_port = htons(DEFAULT_PORT);
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    while ((c = getopt(argc, argv, "p:l:h")) != -1) {
+    while ((c = getopt(argc, argv, "p:l:hd")) != -1) {
         switch(c) {
             case 'p':
                 server.addr.sin_port = htons(atoi(optarg));
@@ -450,8 +477,10 @@ void parseOptions(int argc, char *argv[]) {
                 server.addr.sin_addr.s_addr = inet_addr(optarg);
                 break;
             case 'h':
-                printf("usage: cute -l 127.0.0.1 -p 9999\n");
+                printf("usage: cute [-l address] [-p port] [-h help] [-d daemon]\n");
                 exit(0);
+            case 'd':
+                background();
                 break;
         }
     }
