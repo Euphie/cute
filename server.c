@@ -280,7 +280,9 @@ void pipeForLocal(int connfd, int remotefd) {
 }
 
 void* __pipeForLocal(void* args) {
+#ifdef __APPLE__
     pthread_setname_np("__pipeForLocal"); //调试用
+#endif
     struct conn* conn = (struct conn*)args;
     printf("current fd:%d in __pipeForLocal\n", conn->localfd);
     pipeForLocal(conn->localfd, conn->remotefd);
@@ -293,7 +295,6 @@ void* __pipeForLocal(void* args) {
 
 void* handleConnection(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
-    pthread_setname_np("handleConnection"); //调试用
     for (;;) {
         pthread_mutex_lock(&server.connMutex);
         while (server.currConnCount == 0) {
@@ -343,7 +344,9 @@ void* handleConnection(void *args) {
 
 void* __handleConnection(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
+#ifdef __APPLE__
     pthread_setname_np("handleConnection"); //调试用
+#endif
     struct conn* conn = (struct conn*)args;
     conn->fin = 0;
     pthread_mutex_init(&conn->finMutex, NULL);
