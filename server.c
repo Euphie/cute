@@ -435,8 +435,33 @@ void test() {
 
 //#define M_WORKER
 
-int main(int argc, char **argv) {
+void parseOptions(int argc, char *argv[]) {
+    int c;
+    memset(&server.addr, 0, sizeof(server.addr));
+    server.addr.sin_family = AF_INET;
+    server.addr.sin_port = htons(DEFAULT_PORT);
+    server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    while ((c = getopt(argc, argv, "p:l:h")) != -1) {
+        switch(c) {
+            case 'p':
+                server.addr.sin_port = htons(atoi(optarg));
+                break;
+            case 'l':
+                server.addr.sin_addr.s_addr = inet_addr(optarg);
+                break;
+            case 'h':
+                printf("usage: cute -l 127.0.0.1 -p 9999\n");
+                exit(0);
+                break;
+        }
+    }
+    
+    return;
+}
+
+int main(int argc, char *argv[]) {
      //test();
+    parseOptions(argc, argv);
     server.poolSize = 20;
     server.currConnCount = 0;
     server.maxConnCount = 100;
@@ -461,11 +486,6 @@ int main(int argc, char **argv) {
         error("failed to create socket.\n");
     }
     
-    memset(&server.addr, 0, sizeof(server.addr));
-    server.addr.sin_family = AF_INET;
-    server.addr.sin_port = htons(DEFAULT_PORT);
-    server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    
     if (bind(server.fd, (struct sockaddr *)&server.addr, sizeof(server.addr)) < 0) {
         error("failed to bind the address.\n");
     }
@@ -473,6 +493,6 @@ int main(int argc, char **argv) {
     if (listen(server.fd, server.maxConnCount * 2) < 0) {
         error("failed to listen.\n");
     }
-    printf("server starting...\n");
+    printf("server %s:%d has started...\n", inet_ntoa(server.addr.sin_addr), ntohs(server.addr.sin_port));
     server.runServer(&server);
 }
