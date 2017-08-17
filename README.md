@@ -24,7 +24,7 @@ example: cute -l 119.88.88.88 -p 9999 -d
 
 * Cute Client
 
-The Cute client does not currently implement by C language, bug only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.
+The Cute client does not currently implement by C language, just only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.
 
 ```
 usage: cute-client [-s cute server address] [-p cute server port] [-l local socks5 port] [-t timeout in seconds] [-h help]
