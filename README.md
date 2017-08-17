@@ -16,6 +16,6 @@ make
 
 Command line syntax goes as follows:
 ```
-usage: usage: cute [-l address] [-p port] [-h help] [-d daemon]
+usage: cute [-l address] [-p port] [-h help] [-d daemon]
 example: cute -l 10.0.0.10 -p 9999 -d
 ```
