@@ -1,5 +1,5 @@
-#ifndef _INT_LIB_H_
-#define _INT_LIB_H_
+#ifndef _FUNC_H_
+#define _FUNC_H_
 int _tolower(int c)
 {
     if (c >= 'A' && c <= 'Z')

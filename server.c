@@ -22,6 +22,9 @@
 #define DEFAULT_LINE_MAX 256
 #define WEB_SOCKET_KEY_LEN_MAX 256
 
+#define PROXY_MODEL_WS 0
+#define PROXY_MODEL_SS 1
+
 struct conn {
     int localfd;
     int remotefd;
@@ -36,7 +39,8 @@ typedef struct cuteServer {
     int pid;
     int fd;
     int poolSize;
-    volatile int currPoolIndex;
+    int model;
+    volatile int index;
     volatile int maxConnCount;
     volatile int currConnCount;
     pthread_t *tids;
@@ -45,10 +49,28 @@ typedef struct cuteServer {
     pthread_cond_t connFullCond;
     struct sockaddr_in addr;
     struct conn *pool;
-    void (*runServer)(struct cuteServer *);
-    void (*handleSignal)(int);
-    void *(*handleConnection)(void *);
+    void (*serverHandler)(struct cuteServer *);
+    void (*sinalHandler)(int);
+    void* (*connHandler)(void *);
 } cuteServer;
+
+int getRequest(int fd, char *payloadData);
+int sendResponse(int fd, char* data, int dataLen);
+char *getAcceptKey(char* buff);
+char *getSecKey(char* buff);
+int packData(char* frame, char* data, int dataLen);
+int shakeHand(int fd);
+int connectToRemote(const char *hostname, const char *serv);
+void pipeForRemote(int connfd, int remotefd);
+void pipeForLocal(int connfd, int remotefd);
+void waitSignal(int signal);
+void startup(struct cuteServer *server);
+void __startup(struct cuteServer *server);
+void* handleConnByWS(void *args);
+void* __handleConnByWS(void *args);
+void* handleConnBySS(void *args);
+void closeConn(int fd);
+void error(char *message);
 
 cuteServer server;
 void error(char *message) {
@@ -103,6 +125,21 @@ int getRequest(int fd, char *payloadData) {
     }
     
     return len;
+}
+
+int sendResponse(int fd, char* data, int dataLen) {
+    int len = 0;
+    char buff[DEFAULT_BUFF_SIZE + 4];
+    if (fd < 0) {
+        return len;
+    }
+    
+    int frameLen = packData(buff, data, dataLen);
+    if (frameLen <= 0) {
+        return len;
+    }
+    
+    return (int)write(fd, buff, frameLen);
 }
 
 char *getSecKey(char* buff) {
@@ -213,21 +250,6 @@ int packData(char* frame, char* data, int dataLen) {
     return len;
 }
 
-int sendResponse(int fd, char* data, int dataLen) {
-    int len = 0;
-    char buff[DEFAULT_BUFF_SIZE + 4];
-    if (fd < 0) {
-        return len;
-    }
-    
-    int frameLen = packData(buff, data, dataLen);
-    if (frameLen <= 0) {
-        return len;
-    }
-    
-    return (int)write(fd, buff, frameLen);
-}
-
 void closeConn(int fd) {
     //shutdown(fd, 2);
     close(fd);
@@ -284,7 +306,7 @@ void pipeForLocal(int connfd, int remotefd) {
 
 void* __pipeForLocal(void* args) {
 #ifdef __APPLE__
-    pthread_setname_np("__pipeForLocal"); //调试用
+    pthread_setname_np("__pipeForLocal");
 #endif
     struct conn* conn = (struct conn*)args;
     printf("current fd:%d in __pipeForLocal\n", conn->localfd);
@@ -296,7 +318,8 @@ void* __pipeForLocal(void* args) {
     return (void*)0;
 }
 
-void* handleConnection(void *args) {
+// TODO
+void* __handleConnByWS(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
     for (;;) {
         pthread_mutex_lock(&server.connMutex);
@@ -304,9 +327,9 @@ void* handleConnection(void *args) {
             pthread_cond_wait(&server.connEmptyCond, &server.connMutex);
         }
         
-        server.currPoolIndex--;
+        server.index--;
         server.currConnCount--;
-        struct conn conn = server.pool[server.currPoolIndex];
+        struct conn conn = server.pool[server.index];
         pthread_cond_signal(&server.connFullCond);
         pthread_mutex_unlock(&server.connMutex);
         
@@ -337,25 +360,26 @@ void* handleConnection(void *args) {
                 }
             }
         }
-        
-    close:
-        closeConn(conn.localfd);
     }
     
-    return 0;
+close:
+    
+    return (void*)0;
 }
 
-void* __handleConnection(void *args) {
+void waitSignal(int signal) {return;}
+
+void* handleConnByWS(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
 #ifdef __APPLE__
-    pthread_setname_np("handleConnection"); //调试用
+    pthread_setname_np("handleConnByWS");
 #endif
     struct conn* conn = (struct conn*)args;
     conn->fin = 0;
     pthread_mutex_init(&conn->finMutex, NULL);
     pthread_cond_init(&conn->finCond, NULL);
     
-    printf("current fd:%d in __handleConnection\n", conn->localfd);
+    printf("current fd:%d in handleConnByWS\n", conn->localfd);
     
     if(shakeHand(conn->localfd) <= 0) {
         closeConn(conn->localfd);
@@ -390,12 +414,38 @@ void* __handleConnection(void *args) {
     return 0;
 }
 
-void waitSignal(int signal) {return;}
+// TODO
+void* handleConnBySS(void *args) {
+    char buff[DEFAULT_BUFF_SIZE];
+    struct conn* conn = (struct conn*)args;
+    conn->fin = 0;
+    pthread_mutex_init(&conn->finMutex, NULL);
+    pthread_cond_init(&conn->finCond, NULL);
+    
+    // int n = (int)recv(conn->localfd, buff, sizeof(buff), 0);
+    
+    return 0;
+}
 
-void runWithWebsocket(struct cuteServer *server) {
+void startup(struct cuteServer *server) {
+    signal(SIGPIPE, SIG_IGN);
+    int i;
+    for (;;) {
+        struct conn* conn = (struct conn*)malloc(sizeof(struct conn));
+        socklen_t len = sizeof(len);
+        memset(&conn->localAddr, 0, sizeof(conn->localAddr));
+        conn->localfd = accept(server->fd, (struct sockaddr *)&conn->localAddr, &len);
+        printf("accepting...\n");
+        if(pthread_create(&server->tids[i], NULL, server->connHandler, (void*)conn) != 0) {
+            error("failed to create thread.\n");
+        }
+    }
+}
+
+void __startup(struct cuteServer *server) {
     int i;
     for (i = 0; i < server->poolSize; i++) {
-        if (pthread_create(&server->tids[i], NULL, server->handleConnection, NULL) != 0)
+        if (pthread_create(&server->tids[i], NULL, server->connHandler, NULL) != 0)
             error("failed to create threads.\n");
     }
     
@@ -410,25 +460,14 @@ void runWithWebsocket(struct cuteServer *server) {
         memset(&conn.localAddr, 0, sizeof(conn.localAddr));
         printf("accepting...\n");
         conn.localfd = accept(server->fd, (struct sockaddr *)&conn.localAddr, &len);
-        server->pool[server->currPoolIndex] = conn;
+        server->pool[server->index] = conn;
         server->currConnCount++;
-        server->currPoolIndex++;
+        server->index++;
         pthread_cond_broadcast(&server->connEmptyCond);
         pthread_mutex_unlock(&server->connMutex);
     }
 }
-void __runWithWebsocket(struct cuteServer *server) {
-    signal(SIGPIPE, SIG_IGN);
-    int i;
-    for (;;) {
-        struct conn* conn = (struct conn*)malloc(sizeof(struct conn));
-        socklen_t len = sizeof(len);
-        memset(&conn->localAddr, 0, sizeof(conn->localAddr));
-        conn->localfd = accept(server->fd, (struct sockaddr *)&conn->localAddr, &len);
-        printf("accepting...\n");
-        pthread_create(&server->tids[i], NULL, server->handleConnection, (void*)conn);
-    }
-}
+
 
 void background() {
     int pid;
@@ -455,6 +494,7 @@ void background() {
 }
 
 void test() {
+    // for test
     // connectToRemote("euphie.me", "80");
     // sleep(20);
     // exit(0);
@@ -462,13 +502,13 @@ void test() {
 
 //#define M_WORKER
 
-void parseOptions(int argc, char *argv[]) {
+void initOptions(int argc, char *argv[]) {
     int c;
     memset(&server.addr, 0, sizeof(server.addr));
     server.addr.sin_family = AF_INET;
     server.addr.sin_port = htons(DEFAULT_PORT);
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    while ((c = getopt(argc, argv, "p:l:hd")) != -1) {
+    while ((c = getopt(argc, argv, "p:l:m:hd")) != -1) {
         switch(c) {
             case 'p':
                 server.addr.sin_port = htons(atoi(optarg));
@@ -476,12 +516,12 @@ void parseOptions(int argc, char *argv[]) {
             case 'l':
                 server.addr.sin_addr.s_addr = inet_addr(optarg);
                 break;
-            case 'h':
-                printf("usage: cute [-l address] [-p port] [-h help] [-d daemon]\n");
-                exit(0);
             case 'd':
                 background();
                 break;
+            case 'h':
+                printf("usage: cute [-l address] [-p port] [-h help] [-d daemon]\n");
+                exit(0);
         }
     }
     
@@ -490,19 +530,21 @@ void parseOptions(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
      //test();
-    parseOptions(argc, argv);
+    initOptions(argc, argv);
     server.poolSize = 20;
     server.currConnCount = 0;
-    server.maxConnCount = 100;
-    server.currPoolIndex = 0;
+    server.maxConnCount = 1000;
+    server.index = 0;
     server.pid = getpid();
-    server.handleSignal = waitSignal;
+    server.model = PROXY_MODEL_WS;
+    server.sinalHandler = waitSignal;
 #ifdef M_WORKER
-    server.runServer = runWithWebsocket;
-    server.handleConnection = handleConnection;
+    // TODO
+    server.connHandler = __handleConnByWS;
+    server.serverHandler = __starup;
 #else
-    server.runServer = __runWithWebsocket;
-    server.handleConnection = __handleConnection;
+    server.connHandler = handleConnByWS;
+    server.serverHandler = startup;
 #endif
     server.tids = (pthread_t *)malloc(sizeof(pthread_t) * server.poolSize);
     server.pool = (struct conn *)malloc(sizeof(struct conn) * server.poolSize);
@@ -522,6 +564,7 @@ int main(int argc, char *argv[]) {
     if (listen(server.fd, server.maxConnCount * 2) < 0) {
         error("failed to listen.\n");
     }
+    
     printf("server %s:%d has started...\n", inet_ntoa(server.addr.sin_addr), ntohs(server.addr.sin_port));
-    server.runServer(&server);
+    server.serverHandler(&server);
 }
