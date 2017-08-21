@@ -11,6 +11,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "base64.h"
 #include "cJSON.h"
@@ -81,13 +82,14 @@ void error(char *message) {
 int getRequest(int fd, char *payloadData) {
     char buff[DEFAULT_BUFF_SIZE];
     char masks[4];
-    ssize_t n = recv(fd, buff, 2, 0);
-    int len = 0;
+    int len = -1;
+    ssize_t n = 0;
     if(fd <= 0) {
         return len;
     }
+    n = read(fd, buff, 2);
     if (n <= 0) {
-        return len;
+        return (int)n;
     }
     char fin = (buff[0] & 0x80) == 0x80; // 1bit，1表示最后一帧
     if (!fin) {
@@ -100,20 +102,20 @@ int getRequest(int fd, char *payloadData) {
     int payloadLen = buff[1] & 0x7F; // 数据长度
     if (payloadLen == 126) {
         memset(buff, 0, sizeof(buff));
-        n = recv(fd, buff, 6, 0);
+        n = recv(fd, buff, 6, MSG_WAITALL);
         payloadLen = (buff[0] & 0xFF) << 8 | (buff[1] & 0xFF);
         memcpy(masks, buff + 2, 4);
         memset(buff, 0, sizeof(buff));
-        n = recv(fd, buff, payloadLen, 0);
+        n = recv(fd, buff, payloadLen, MSG_WAITALL);
     } else if (payloadLen == 127) {
         // 有空了实现
         return len;
     } else {
         memset(buff, 0, sizeof(buff));
-        n = recv(fd, buff, 4, 0);
+        n = recv(fd, buff, 4, MSG_WAITALL);
         memcpy(masks, buff, 4);
         memset(buff, 0, sizeof(buff));
-        n = recv(fd, buff, payloadLen, 0);
+        n = recv(fd, buff, payloadLen, MSG_WAITALL);
     }
     
     len = payloadLen;
@@ -139,7 +141,7 @@ int sendResponse(int fd, char* data, int dataLen) {
         return len;
     }
     
-    return (int)write(fd, buff, frameLen);
+    return (int)send(fd, buff, frameLen, MSG_WAITALL);
 }
 
 char *getSecKey(char* buff) {
@@ -287,21 +289,85 @@ int connectToRemote(const char *hostname, const char *serv) {
     return sockfd;
 }
 
-void pipeForRemote(int connfd, int remotefd) {
-    int len = 0;
+void pipeForRemote(int localfd, int remotefd) {
+    int readlen = 0;
+    int writelen = 0;
     char buff[DEFAULT_BUFF_SIZE];
-    while ((len = (int)recv(remotefd, buff, sizeof(buff), 0)) > 0) {
-        sendResponse(connfd, buff, len);
+    
+    // 设置读超时时间
+    struct timeval tv;
+    tv.tv_sec = 300;
+    tv.tv_usec = 0;
+    
+#ifdef __APPLE__
+    int opt = 1;
+    setsockopt(localfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+#endif
+    
+    for(;;) {
+#ifdef __APPLE__
+        setsockopt (remotefd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
+#endif
+        
+        readlen = (int)read(remotefd, buff, sizeof(buff));
+        if(readlen > 0) {
+            writelen = sendResponse(localfd, buff, readlen);
+            if(writelen < 0) {
+                printf("pipeForRemote write errno:%d\n", errno);
+                break;
+            }
+        }
+        if(readlen == 0) {
+            break;
+        }
+        if(readlen < 0) {
+            printf("pipeForRemote read errno:%d\n", errno);
+            break;
+        }
     }
+    
+    close(remotefd);
+    printf("localfd(%d) closed:\n", localfd);
 }
 
-void pipeForLocal(int connfd, int remotefd) {
-    printf("current fd:%d in pipeForLocal\n", connfd);
-    int len = 0;
+void pipeForLocal(int localfd, int remotefd) {
+    int readlen = 0;
+    int writelen = 0;
     char buff[DEFAULT_BUFF_SIZE];
-    while ((len = getRequest(connfd, buff)) > 0) {
-        send(remotefd, buff, len, 0);
+    
+    // 设置读超时时间
+    struct timeval tv;
+    tv.tv_sec = 300;
+    tv.tv_usec = 0;
+    
+#ifdef __APPLE__
+    int opt = 1;
+    setsockopt(localfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+#endif
+    for(;;) {
+#ifdef __APPLE__
+        setsockopt (remotefd, SOL_SOCKET, SO_NOSIGPIPE, &opt, sizeof(opt));
+#endif
+        
+        readlen = getRequest(localfd, buff);
+        if(readlen > 0) {
+            writelen = (int)send(remotefd, buff, readlen, MSG_WAITALL);
+            if(writelen < 0) {
+                printf("pipeForLocal write errno:%d\n", errno);
+                break;
+            }
+        }
+        if(readlen == 0) {
+            break;
+        }
+        if(readlen < 0) {
+            printf("pipeForLocal read errno:%d\n", errno);
+            break;
+        }
     }
+    
+    close(localfd);
+    printf("remotefd(%d) closed:\n", remotefd);
 }
 
 void* __pipeForLocal(void* args) {
@@ -401,11 +467,12 @@ void* handleConnByWS(void *args) {
                     pthread_t tid;
                     pthread_create(&tid, NULL, __pipeForLocal, (void*)conn);
                     pipeForRemote(conn->localfd, conn->remotefd);
-                    while (!conn->fin) {
-                        pthread_cond_wait(&conn->finCond, &conn->finMutex);
-                    }
-                    closeConn(conn->localfd);
-                    closeConn(conn->remotefd);
+                    //                    while (!conn->fin) {
+                    //                        pthread_cond_wait(&conn->finCond, &conn->finMutex);
+                    //                    }
+                    //                    printf("handleConnByWS:%d,%d\n", conn->localfd, conn->remotefd);
+                    //                    closeConn(conn->localfd);
+                    //                    closeConn(conn->remotefd);
                 }
             }
         }
@@ -428,7 +495,6 @@ void* handleConnBySS(void *args) {
 }
 
 void startup(struct cuteServer *server) {
-    signal(SIGPIPE, SIG_IGN);
     int i;
     for (;;) {
         struct conn* conn = (struct conn*)malloc(sizeof(struct conn));
@@ -477,7 +543,7 @@ void background() {
     } else if(pid< 0) {
         exit(1);
     }
-
+    
     setsid();
     if((pid=fork())) {
         exit(0);
@@ -529,7 +595,13 @@ void initOptions(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-     //test();
+    
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &sa, NULL);
+    
+    //test();
     initOptions(argc, argv);
     server.poolSize = 20;
     server.currConnCount = 0;
