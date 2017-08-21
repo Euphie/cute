@@ -21,6 +21,7 @@
 #define DEFAULT_BUFF_SIZE 9999
 #define DEFAULT_PORT 7777
 #define DEFAULT_LINE_MAX 256
+#define DEFUALT_READ_TIMEOUT 9999
 #define WEB_SOCKET_KEY_LEN_MAX 256
 
 #define PROXY_MODEL_WS 0
@@ -296,7 +297,7 @@ void pipeForRemote(int localfd, int remotefd) {
     
     // 设置读超时时间
     struct timeval tv;
-    tv.tv_sec = 300;
+    tv.tv_sec = DEFUALT_READ_TIMEOUT;
     tv.tv_usec = 0;
     
 #ifdef __APPLE__
@@ -337,7 +338,7 @@ void pipeForLocal(int localfd, int remotefd) {
     
     // 设置读超时时间
     struct timeval tv;
-    tv.tv_sec = 300;
+    tv.tv_sec = DEFUALT_READ_TIMEOUT;
     tv.tv_usec = 0;
     
 #ifdef __APPLE__
@@ -508,6 +509,7 @@ void startup(struct cuteServer *server) {
     }
 }
 
+// TODO
 void __startup(struct cuteServer *server) {
     int i;
     for (i = 0; i < server->poolSize; i++) {
