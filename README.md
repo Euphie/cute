@@ -4,6 +4,12 @@
 
 A simple proxy server with websocket.
 
+## Features
+
+1. Multi-user support.
+2. High performance.
+3. Simple to use.
+
 ## Installation
 
 On Linux compile the software using "make" or "make install". 
@@ -46,3 +52,7 @@ usage: bin/cute-client-xxx options
   
 example: bin/cute-client-osx -s 119.88.88.88 -p 9999 -k 123456 -u cute
 ```
+
+## Communication
+
+E-mail: euphie@yahoo.com
