@@ -1,4 +1,4 @@
-## Cute [![cute](http://euphie.me/svg/cute.version.0.7.svg)](http://euphie.me) #
+## Cute
 
 ## Description
 
