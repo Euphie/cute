@@ -19,7 +19,7 @@ bin/cute
 Command line syntax goes as follows:
 ```
 usage: cute [-l address] [-p port] [-h help] [-d daemon]
-example: cute -l 119.88.88.88 -p 9999 -d
+example: bin/cute -l 119.88.88.88 -p 9999 -d
 ```
 
 * Cute Client
@@ -27,6 +27,6 @@ example: cute -l 119.88.88.88 -p 9999 -d
 The Cute client does not currently implement by C language, just only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.
 
 ```
-usage: cute-client [-s cute server address] [-p cute server port] [-l local socks5 port] [-t timeout in seconds] [-h help]
-example: cute -s 119.88.88.88 -p 9999
+usage: bin/cute-client-xxx [-s cute server address] [-p cute server port] [-l local socks5 port] [-t timeout in seconds] [-h help]
+example: bin/cute-client-osx -s 119.88.88.88 -p 9999
 ```
