@@ -6,9 +6,11 @@ A simple proxy server with websocket.
 
 ## Installation
 
-On Linux compile the software using "make". 
+On Linux compile the software using "make" or "make install". 
 ```
-make
+cd src
+make install
+cd ..
 bin/cute 
 ```
 
@@ -18,8 +20,13 @@ bin/cute
 
 Command line syntax goes as follows:
 ```
-usage: cute [-l address] [-p port] [-h help] [-d daemon]
-example: bin/cute -l 119.88.88.88 -p 9999 -d
+usage: bin/cute options
+  [-l address]
+  [-p port]
+  [-d daemon]
+  [-c config file]
+  [-h help]
+example: bin/cute -p 9999 -d -c config/cute.ini
 ```
 
 * Cute Client
@@ -27,6 +34,13 @@ example: bin/cute -l 119.88.88.88 -p 9999 -d
 The Cute client does not currently implement by C language, just only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.
 
 ```
-usage: bin/cute-client-xxx [-s cute server address] [-p cute server port] [-l local socks5 port] [-t timeout in seconds] [-h help]
-example: bin/cute-client-osx -s 119.88.88.88 -p 9999
+usage: bin/cute-client-xxx options
+  -u user name
+  -k password
+  -s cute server address
+  [-p cute server port]
+  [-l local socks5 port]
+  [-t timeout in seconds]
+  [-h help]
+example: bin/cute-client-osx -s 119.88.88.88 -p 9999 -k 123456 -u cute
 ```
