@@ -27,7 +27,7 @@ int htoi(const char s[],int start,int len)
     i+=start;
     j=0;
     for (; (s[i] >= '0' && s[i] <= '9')
-            || (s[i] >= 'a' && s[i] <= 'f') || (s[i] >='A' && s[i] <= 'F'); ++i)
+         || (s[i] >= 'a' && s[i] <= 'f') || (s[i] >='A' && s[i] <= 'F'); ++i)
     {
         if(j>=len)
         {
@@ -84,6 +84,31 @@ int Split(char *src, char *delim, IString *istr) // split buf
     str = p = NULL;
     
     return 1;
+}
+
+char *trim(char *str)
+{
+    char *p = str;
+    char *p1;
+    if(p)
+    {
+        p1 = p + strlen(str) - 1;
+        while(*p && isspace(*p)) p++;
+        while(p1 > p && isspace(*p1)) *p1-- = '/0';
+    }
+    return p;
+}
+
+char* join(char *s1, char *s2)
+{
+    char *result = malloc(strlen(s1)+strlen(s2)+1);//+1 for the zero-terminator
+    //in real code you would check for errors in malloc here
+    if (result == NULL) exit (1);
+    
+    strcpy(result, s1);
+    strcat(result, s2);
+    
+    return result;
 }
 
 #endif

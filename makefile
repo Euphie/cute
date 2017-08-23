@@ -1,6 +1,9 @@
 project=cute
-CC=gcc
+cc=gcc
+source=server.c cJSON.c config.c
+link=-lpthread -lm
+outdir=bin
 target:
-	$(CC) server.c cJSON.c -lpthread -lm -o bin/$(project)
+	$(cc) $(source) $(link) -o $(outdir)/$(project)
 clean:
-	rm -f bin/$(project)
+	rm -f $(outdir)/$(project)

@@ -17,6 +17,7 @@
 #include "cJSON.h"
 #include "sha1.h"
 #include "func.h"
+#include "config.h"
 
 #define DEFAULT_BUFF_SIZE 9999
 #define DEFAULT_PORT 7777
@@ -26,6 +27,11 @@
 
 #define PROXY_MODEL_WS 0
 #define PROXY_MODEL_SS 1
+
+struct config {
+    char* accounts;
+    char* test;
+} config;
 
 struct conn {
     int localfd;
@@ -42,20 +48,24 @@ typedef struct cuteServer {
     int fd;
     int poolSize;
     int model;
+    int auth;
     volatile int index;
     volatile int maxConnCount;
     volatile int currConnCount;
     pthread_t *tids;
+    pthread_mutex_t accpetMutex;
     pthread_mutex_t connMutex;
     pthread_cond_t connEmptyCond;
     pthread_cond_t connFullCond;
     struct sockaddr_in addr;
     struct conn *pool;
+    struct config config;
     void (*serverHandler)(struct cuteServer *);
     void (*sinalHandler)(int);
     void* (*connHandler)(void *);
 } cuteServer;
 
+int initConfig(char *key, char *value);
 int getRequest(int fd, char *payloadData);
 int sendResponse(int fd, char* data, int dataLen);
 char *getAcceptKey(char* buff);
@@ -76,7 +86,7 @@ void error(char *message);
 
 cuteServer server;
 void error(char *message) {
-    printf("error: %s", message);
+    fprintf(stderr, "error: %s", message);
     exit(1);
 }
 
@@ -448,9 +458,11 @@ void* handleConnByWS(void *args) {
     
     printf("current fd:%d in handleConnByWS\n", conn->localfd);
     
+    pthread_mutex_lock(&server.accpetMutex);
     if(shakeHand(conn->localfd) <= 0) {
         closeConn(conn->localfd);
     }
+    pthread_mutex_unlock(&server.accpetMutex);
     memset(buff, 0, sizeof(buff));
     int len = getRequest(conn->localfd, buff);
     if(len > 0) {
@@ -458,10 +470,28 @@ void* handleConnByWS(void *args) {
         cJSON* json = cJSON_Parse(header);
         if(json) {
             cJSON *service = cJSON_GetObjectItem(json, "Service");
+            if(server.auth == 1) {
+                IString temp1;
+                if (Split(server.config.accounts, " ", &temp1)) {
+                    int i, ok;
+                    cJSON *userName = cJSON_GetObjectItem(json, "UserName");
+                    cJSON *password = cJSON_GetObjectItem(json, "password");
+                    for(i = 0; i < temp1.num; i++) {
+                        printf("%s\n", temp1.str[i]);
+                        if(strcmp(join(join(userName->valuestring, ":"), password->valuestring), temp1.str[i]) == 0) {
+                            ok = 1;
+                            break;
+                        }
+                    }
+                    if(ok != 1) {
+                        closeConn(conn->localfd);
+                    }
+                }
+            }
             // cJSON *type = cJSON_GetObjectItem(json, "Type");
-            IString istr;
-            if (Split(service->valuestring, ":", &istr)) {
-                conn->remotefd = connectToRemote(istr.str[0], istr.str[1]);
+            IString temp2;
+            if (Split(service->valuestring, ":", &temp2)) {
+                conn->remotefd = connectToRemote(temp2.str[0], temp2.str[1]);
                 if (conn->remotefd < 0) {
                     printf("failed to connect remote server.\n");
                 } else {
@@ -561,11 +591,24 @@ void background() {
     umask(0);
 }
 
+int initConfig(char *key, char *value) {
+    if(strcmp(key, "accounts") == 0) {
+        server.config.accounts = (char*)malloc(strlen(value));
+        strcpy(server.config.accounts, value);
+    } else if (strcmp(key, "test") == 0) {
+        server.config.test = (char*)malloc(strlen(value));
+        strcpy(server.config.test, value);
+    }
+    
+    return 0;
+}
+
+
 void test() {
     // for test
-    // connectToRemote("euphie.me", "80");
-    // sleep(20);
-    // exit(0);
+    int flag = parseConfig("/Users/Euphie/Documents/c/cute/config/config.ini", initConfig);
+    printf("%d, %s, %s\n", flag, server.config.accounts, server.config.test);
+    exit(0);
 }
 
 //#define M_WORKER
@@ -576,8 +619,18 @@ void initOptions(int argc, char *argv[]) {
     server.addr.sin_family = AF_INET;
     server.addr.sin_port = htons(DEFAULT_PORT);
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    while ((c = getopt(argc, argv, "p:l:m:hd")) != -1) {
+    server.auth = 0;
+    while ((c = getopt(argc, argv, "p:l:m:c:hd")) != -1) {
         switch(c) {
+            case 'c':
+                if(!parseConfig(optarg, initConfig)) {
+                    if(server.config.accounts) {
+                        server.auth = 1;
+                    }
+                } else {
+                    exit(1);
+                }
+                break;
             case 'p':
                 server.addr.sin_port = htons(atoi(optarg));
                 break;
@@ -603,8 +656,9 @@ int main(int argc, char *argv[]) {
     sa.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &sa, NULL);
     
-    //test();
+    // test();
     initOptions(argc, argv);
+    printf("%s\n", server.config.accounts);
     server.poolSize = 20;
     server.currConnCount = 0;
     server.maxConnCount = 1000;
@@ -622,11 +676,14 @@ int main(int argc, char *argv[]) {
 #endif
     server.tids = (pthread_t *)malloc(sizeof(pthread_t) * server.poolSize);
     server.pool = (struct conn *)malloc(sizeof(struct conn) * server.poolSize);
+    pthread_mutex_init(&server.accpetMutex, NULL);
     pthread_mutex_init(&server.connMutex, NULL);
     pthread_cond_init(&server.connEmptyCond, NULL);
     pthread_cond_init(&server.connFullCond, NULL);
     
     server.fd = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(server.fd, SOL_SOCKET, SO_REUSEADDR, &opt,sizeof(opt));
     if (server.fd < 0) {
         error("failed to create socket.\n");
     }
