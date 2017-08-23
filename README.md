@@ -26,12 +26,13 @@ usage: bin/cute options
   [-d daemon]
   [-c config file]
   [-h help]
+  
 example: bin/cute -p 9999 -d -c config/cute.ini
 ```
 
 * Cute Client
 
-The Cute client does not currently implement by C language, just only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.
+The Cute client does not currently implement by C language, just only the GOLANG version in the bin directory. I compiled different client-side executables for different platforms.You can use a browser plugin such as SwitchyOmega(A Google Chrome extension) after you started the client then set up the socks5 proxy with the Cute local address.
 
 ```
 usage: bin/cute-client-xxx options
@@ -42,5 +43,6 @@ usage: bin/cute-client-xxx options
   [-l local socks5 port]
   [-t timeout in seconds]
   [-h help]
+  
 example: bin/cute-client-osx -s 119.88.88.88 -p 9999 -k 123456 -u cute
 ```
