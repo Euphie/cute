@@ -1,4 +1,4 @@
-## Cute
+## Cute [![Travis](https://img.shields.io/travis/rust-lang/rust.svg)]() ![](https://img.shields.io/badge/version-v0.7-yellow.svg)
 
 ## Description
 
