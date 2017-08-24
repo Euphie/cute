@@ -34,6 +34,8 @@ usage: bin/cute options
   [-h help]
   
 example: bin/cute -p 9999 -d -c config/cute.ini
+
+ps: The options will overwrite the contents of the configuration file. 
 ```
 
 * Cute Client
