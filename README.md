@@ -14,10 +14,11 @@ A simple proxy server with websocket.
 
 On Linux compile the software using "make" or "make install". 
 ```
+git clone https://github.com/Euphie/cute.git
 cd src
 make install
 cd ..
-bin/cute 
+bin/cute -c config/cute.ini 
 ```
 
 ## Basic usage
@@ -34,6 +35,8 @@ usage: bin/cute options
   [-h help]
   
 example: bin/cute -p 9999 -d -c config/cute.ini
+
+ps: The options will overwrite the contents of the configuration file. 
 ```
 
 * Cute Client
