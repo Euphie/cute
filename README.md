@@ -14,6 +14,7 @@ A simple proxy server with websocket.
 
 On Linux compile the software using "make" or "make install". 
 ```
+git clone https://github.com/Euphie/cute.git
 cd src
 make install
 cd ..
