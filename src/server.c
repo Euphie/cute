@@ -30,6 +30,9 @@
 
 struct config {
     char* accounts;
+    char* address;
+    char* port;
+    char* daemon;
     char* test;
 } config;
 
@@ -49,6 +52,7 @@ typedef struct cuteServer {
     int poolSize;
     int model;
     int auth;
+    int daemon;
     volatile int index;
     volatile int maxConnCount;
     volatile int currConnCount;
@@ -525,7 +529,7 @@ void* handleConnBySS(void *args) {
 }
 
 void startup(struct cuteServer *server) {
-    int i;
+    int i = 0;
     for (;;) {
         struct conn* conn = (struct conn*)malloc(sizeof(struct conn));
         socklen_t len = sizeof(len);
@@ -535,6 +539,8 @@ void startup(struct cuteServer *server) {
         if(pthread_create(&server->tids[i], NULL, server->connHandler, (void*)conn) != 0) {
             error("failed to create thread.\n");
         }
+        
+        i++;
     }
 }
 
@@ -597,6 +603,15 @@ int initConfig(char *key, char *value) {
     } else if (strcmp(key, "test") == 0) {
         server.config.test = (char*)malloc(strlen(value));
         strcpy(server.config.test, value);
+    } else if(strcmp(key, "address") == 0) {
+        server.config.address = (char*)malloc(strlen(value));
+        strcpy(server.config.address, value);
+    } else if(strcmp(key, "port") == 0) {
+        server.config.port = (char*)malloc(strlen(value));
+        strcpy(server.config.port, value);
+    } else if(strcmp(key, "daemon") == 0) {
+        server.config.daemon = (char*)malloc(strlen(value));
+        strcpy(server.config.daemon, value);
     }
     
     return 0;
@@ -619,12 +634,25 @@ void initOptions(int argc, char *argv[]) {
     server.addr.sin_port = htons(DEFAULT_PORT);
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server.auth = 0;
+    server.daemon = 0;
     while ((c = getopt(argc, argv, "p:l:m:c:hd")) != -1) {
         switch(c) {
             case 'c':
                 if(!parseConfig(optarg, initConfig)) {
                     if(server.config.accounts) {
                         server.auth = 1;
+                    }
+                    
+                    if(server.config.address) {
+                        server.addr.sin_addr.s_addr = inet_addr(server.config.address);
+                    }
+                    
+                    if(server.config.port) {
+                        server.addr.sin_port = htons(atoi(server.config.port));
+                    }
+                    
+                    if(strcmp(server.config.daemon, "yes") == 0) {
+                        server.daemon = 1;
                     }
                 } else {
                     exit(1);
@@ -637,7 +665,7 @@ void initOptions(int argc, char *argv[]) {
                 server.addr.sin_addr.s_addr = inet_addr(optarg);
                 break;
             case 'd':
-                background();
+                server.daemon = 1;
                 break;
             case 'h':
                 printf("usage: cute [-l address] [-p port] [-h help] [-d daemon]\n");
@@ -657,6 +685,11 @@ int main(int argc, char *argv[]) {
     
     // test();
     initOptions(argc, argv);
+    
+    if(server.daemon == 1) {
+        background();
+    }
+    
     server.poolSize = 20;
     server.currConnCount = 0;
     server.maxConnCount = 1000;
