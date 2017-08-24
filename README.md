@@ -18,7 +18,7 @@ git clone https://github.com/Euphie/cute.git
 cd src
 make install
 cd ..
-bin/cute 
+bin/cute -c config/cute.ini 
 ```
 
 ## Basic usage
