@@ -16,7 +16,7 @@
 #include "base64.h"
 #include "cJSON.h"
 #include "sha1.h"
-#include "func.h"
+#include "util.h"
 #include "config.h"
 
 #define DEFAULT_BUFF_SIZE 9999
@@ -106,15 +106,15 @@ int getRequest(int fd, char *payloadData) {
     if (n <= 0) {
         return (int)n;
     }
-    char fin = (buff[0] & 0x80) == 0x80; // 1bit，1表示最后一帧
+    char fin = (buff[0] & 0x80) == 0x80;
     if (!fin) {
         return len;
     }
-    char maskFlag = (buff[1] & 0x80) == 0x80; // 是否包含掩码
+    char maskFlag = (buff[1] & 0x80) == 0x80;
     if (!maskFlag) {
         return len;
     }
-    int payloadLen = buff[1] & 0x7F; // 数据长度
+    int payloadLen = buff[1] & 0x7F;
     if (payloadLen == 126) {
         memset(buff, 0, sizeof(buff));
         n = recv(fd, buff, 6, MSG_WAITALL);
@@ -123,7 +123,7 @@ int getRequest(int fd, char *payloadData) {
         memset(buff, 0, sizeof(buff));
         n = recv(fd, buff, payloadLen, MSG_WAITALL);
     } else if (payloadLen == 127) {
-        // 有空了实现
+        // TODO
         return len;
     } else {
         memset(buff, 0, sizeof(buff));
@@ -260,7 +260,7 @@ int packData(char* frame, char* data, int dataLen) {
         memcpy(frame + 4, data, dataLen);
         len = dataLen + 4;
     } else {
-        //有空实现
+        //TODO
         len = 0;
     }
     
@@ -309,7 +309,6 @@ void pipeForRemote(int localfd, int remotefd) {
     int writelen = 0;
     char buff[DEFAULT_BUFF_SIZE];
     
-    // 设置读超时时间
     struct timeval tv;
     tv.tv_sec = DEFUALT_READ_TIMEOUT;
     tv.tv_usec = 0;
@@ -350,7 +349,6 @@ void pipeForLocal(int localfd, int remotefd) {
     int writelen = 0;
     char buff[DEFAULT_BUFF_SIZE];
     
-    // 设置读超时时间
     struct timeval tv;
     tv.tv_sec = DEFUALT_READ_TIMEOUT;
     tv.tv_usec = 0;
@@ -399,7 +397,7 @@ void* __pipeForLocal(void* args) {
     return (void*)0;
 }
 
-// TODO
+//TODO
 void* __handleConnByWS(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
     for (;;) {
@@ -425,11 +423,16 @@ void* __handleConnByWS(void *args) {
             if(json) {
                 cJSON *service = cJSON_GetObjectItem(json, "Service");
                 // cJSON *type = cJSON_GetObjectItem(json, "Type");
-                IString istr;
-                if (Split(service->valuestring, ":", &istr)) {
-                    conn.remotefd = connectToRemote(istr.str[0], istr.str[1]);
+                
+                char* host;
+                char* port;
+                char *savePtr;
+                host = strtok_r(service->valuestring, ":", &savePtr);
+                port = strtok_r(NULL, ":", &savePtr);
+                if (host != NULL && port != NULL) {
+                    conn.remotefd = connectToRemote(host, port);
                     if (conn.remotefd < 0) {
-                        printf("failed to connect remote server.\n");
+                        printf("failed to connect remote server(%s:%s).\n", host, port);
                     } else {
                         pthread_t *tidptr = (pthread_t*)malloc(sizeof(pthread_t));
                         pthread_create(tidptr, NULL, __pipeForLocal, (void*)&conn);
@@ -473,30 +476,41 @@ void* handleConnByWS(void *args) {
         char* header = buff+1;
         cJSON* json = cJSON_Parse(header);
         if(json) {
-            cJSON *service = cJSON_GetObjectItem(json, "Service");
-            if(server.auth == 1) {
-                IString temp1;
-                if (Split(server.config.accounts, " ", &temp1)) {
-                    int i, ok;
-                    cJSON *userName = cJSON_GetObjectItem(json, "UserName");
-                    cJSON *password = cJSON_GetObjectItem(json, "password");
-                    for(i = 0; i < temp1.num; i++) {
-                        if(strcmp(join(join(userName->valuestring, ":"), password->valuestring), temp1.str[i]) == 0) {
-                            ok = 1;
-                            break;
-                        }
+            if(server.auth == 1 && server.config.accounts) {
+                cJSON *userName = cJSON_GetObjectItem(json, "UserName");
+                cJSON *password = cJSON_GetObjectItem(json, "password");
+                
+                int pass = 0;
+                char *account;
+                char *savePtr;
+                account = strtok_r(server.config.accounts, " ", &savePtr);
+                while(account != NULL){
+                    char* temp = join(join(userName->valuestring, ":"), password->valuestring);
+                    if(strcmp(temp, account) == 0) {
+                        pass = 1;
+                        break;
                     }
-                    if(ok != 1) {
-                        closeConn(conn->localfd);
-                    }
+                    
+                    account = strtok_r(NULL, ",", &savePtr);
+                }
+                
+                if(pass != 1) {
+                    closeConn(conn->localfd);
                 }
             }
+            
+            cJSON *service = cJSON_GetObjectItem(json, "Service");
             // cJSON *type = cJSON_GetObjectItem(json, "Type");
-            IString temp2;
-            if (Split(service->valuestring, ":", &temp2)) {
-                conn->remotefd = connectToRemote(temp2.str[0], temp2.str[1]);
+            
+            char* host;
+            char* port;
+            char *savePtr;
+            host = strtok_r(service->valuestring, ":", &savePtr);
+            port = strtok_r(NULL, ":", &savePtr);
+            if (host != NULL && port != NULL) {
+                conn->remotefd = connectToRemote(host, port);
                 if (conn->remotefd < 0) {
-                    printf("failed to connect remote server.\n");
+                    printf("failed to connect remote server(%s:%s).\n", host, port);
                 } else {
                     pthread_t tid;
                     pthread_create(&tid, NULL, __pipeForLocal, (void*)conn);
@@ -515,7 +529,7 @@ void* handleConnByWS(void *args) {
     return 0;
 }
 
-// TODO
+//TODO
 void* handleConnBySS(void *args) {
     char buff[DEFAULT_BUFF_SIZE];
     struct conn* conn = (struct conn*)args;
@@ -617,11 +631,17 @@ int initConfig(char *key, char *value) {
     return 0;
 }
 
-
 void test() {
     // for test
-    int flag = parseConfig("/Users/Euphie/Documents/c/cute/config/config.ini", initConfig);
-    printf("%d, %s, %s\n", flag, server.config.accounts, server.config.test);
+    parseConfig("/Users/Euphie/Documents/c/cute/config/cute.ini", initConfig);
+    printf("%s\n", server.config.accounts);
+    
+    char *ptr;
+    char *p;
+    ptr = strtok_r(server.config.accounts, " ", &p);
+    printf("%s\n", ptr);
+    ptr = strtok_r(NULL, " ", &p);
+    printf("%s\n", ptr);
     exit(0);
 }
 
@@ -685,6 +705,7 @@ int main(int argc, char *argv[]) {
     
     // test();
     initOptions(argc, argv);
+    
     
     if(server.daemon == 1) {
         background();
