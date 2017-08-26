@@ -693,7 +693,7 @@ int main(int argc, char *argv[]) {
     
     
     if(server.daemon == 1) {
-        // background();
+        background();
     }
     
     server.poolSize = 20;
