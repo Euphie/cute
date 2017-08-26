@@ -22,7 +22,7 @@
 #define DEFAULT_BUFF_SIZE 9999
 #define DEFAULT_PORT 7777
 #define DEFAULT_LINE_MAX 256
-#define DEFUALT_READ_TIMEOUT 9999
+#define DEFUALT_READ_TIMEOUT 300
 #define WEB_SOCKET_KEY_LEN_MAX 256
 
 #define PROXY_MODEL_WS 0
@@ -467,65 +467,62 @@ void* handleConnByWS(void *args) {
     
     pthread_mutex_lock(&server.accpetMutex);
     if(shakeHand(conn->localfd) <= 0) {
-        closeConn(conn->localfd);
+        goto quit;
     }
     pthread_mutex_unlock(&server.accpetMutex);
+    
     memset(buff, 0, sizeof(buff));
     int len = getRequest(conn->localfd, buff);
-    if(len > 0) {
-        char* header = buff+1;
-        cJSON* json = cJSON_Parse(header);
-        if(json) {
-            if(server.auth == 1 && server.config.accounts) {
-                cJSON *userName = cJSON_GetObjectItem(json, "UserName");
-                cJSON *password = cJSON_GetObjectItem(json, "password");
-                
-                int pass = 0;
-                char *account;
-                char *savePtr;
-                account = strtok_r(server.config.accounts, " ", &savePtr);
-                while(account != NULL){
-                    char* temp = join(join(userName->valuestring, ":"), password->valuestring);
-                    if(strcmp(temp, account) == 0) {
-                        pass = 1;
-                        break;
-                    }
-                    
-                    account = strtok_r(NULL, ",", &savePtr);
-                }
-                
-                if(pass != 1) {
-                    closeConn(conn->localfd);
-                }
+    if(len <= 0) {
+        goto quit;
+    }
+    
+    char* header = buff+1;
+    cJSON* json = cJSON_Parse(header);
+    if(!json) {
+        goto quit;
+    }
+    
+    int auth = 0;
+    if(server.auth == 1 && server.config.accounts && strcmp(server.config.accounts, "")) {
+        cJSON *userName = cJSON_GetObjectItem(json, "UserName");
+        cJSON *password = cJSON_GetObjectItem(json, "password");
+        char *account;
+        char *savePtr;
+        account = strtok_r(server.config.accounts, " ", &savePtr);
+        while(account != NULL){
+            char* temp = join(join(userName->valuestring, ":"), password->valuestring);
+            if(strcmp(temp, account) == 0) {
+                auth = 1;
+                break;
             }
-            
-            cJSON *service = cJSON_GetObjectItem(json, "Service");
-            // cJSON *type = cJSON_GetObjectItem(json, "Type");
-            
-            char* host;
-            char* port;
-            char *savePtr;
-            host = strtok_r(service->valuestring, ":", &savePtr);
-            port = strtok_r(NULL, ":", &savePtr);
-            if (host != NULL && port != NULL) {
-                conn->remotefd = connectToRemote(host, port);
-                if (conn->remotefd < 0) {
-                    printf("failed to connect remote server(%s:%s).\n", host, port);
-                } else {
-                    pthread_t tid;
-                    pthread_create(&tid, NULL, __pipeForLocal, (void*)conn);
-                    pipeForRemote(conn->localfd, conn->remotefd);
-                    //                    while (!conn->fin) {
-                    //                        pthread_cond_wait(&conn->finCond, &conn->finMutex);
-                    //                    }
-                    //                    printf("handleConnByWS:%d,%d\n", conn->localfd, conn->remotefd);
-                    //                    closeConn(conn->localfd);
-                    //                    closeConn(conn->remotefd);
-                }
-            }
+            account = strtok_r(NULL, ",", &savePtr);
         }
     }
     
+    if(auth == 0) {
+        goto quit;
+    }
+    
+    cJSON *service = cJSON_GetObjectItem(json, "Service");
+    char* host;
+    char* port;
+    char *savePtr;
+    host = strtok_r(service->valuestring, ":", &savePtr);
+    port = strtok_r(NULL, ":", &savePtr);
+    if (host != NULL && port != NULL) {
+        conn->remotefd = connectToRemote(host, port);
+        if (conn->remotefd < 0) {
+            printf("failed to connect remote server(%s:%s).\n", host, port);
+        } else {
+            pthread_t tid;
+            pthread_create(&tid, NULL, __pipeForLocal, (void*)conn);
+            pipeForRemote(conn->localfd, conn->remotefd);
+        }
+    }
+
+quit:
+    closeConn(conn->localfd);
     return 0;
 }
 
