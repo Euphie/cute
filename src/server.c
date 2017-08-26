@@ -484,9 +484,11 @@ void* handleConnByWS(void *args) {
         auth = 0;
         cJSON *userName = cJSON_GetObjectItem(json, "UserName");
         cJSON *password = cJSON_GetObjectItem(json, "password");
+        char *accounts;
         char *account;
         char *savePtr;
-        account = strtok_r(server.config.accounts, " ", &savePtr);
+        accounts = strdup(server.config.accounts);
+        account = strtok_r(accounts, " ", &savePtr);
         while(account != NULL){
             char* temp = join(join(userName->valuestring, ":"), password->valuestring);
             if(strcmp(temp, account) == 0) {
@@ -495,6 +497,7 @@ void* handleConnByWS(void *args) {
             }
             account = strtok_r(NULL, ",", &savePtr);
         }
+        free(accounts);
     }
     
     if(auth == 0) {
@@ -647,15 +650,12 @@ void initOptions(int argc, char *argv[]) {
                     if(server.config.accounts) {
                         server.needAuth = 1;
                     }
-                    
                     if(server.config.address) {
                         server.addr.sin_addr.s_addr = inet_addr(server.config.address);
                     }
-                    
                     if(server.config.port) {
                         server.addr.sin_port = htons(atoi(server.config.port));
                     }
-                    
                     if(strcmp(server.config.daemon, "yes") == 0) {
                         server.daemon = 1;
                     }
