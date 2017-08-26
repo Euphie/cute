@@ -25,9 +25,6 @@
 #define DEFUALT_READ_TIMEOUT 300
 #define WEB_SOCKET_KEY_LEN_MAX 256
 
-#define PROXY_MODEL_WS 0
-#define PROXY_MODEL_SS 1
-
 struct config {
     char* accounts;
     char* address;
@@ -50,8 +47,7 @@ typedef struct cuteServer {
     int pid;
     int fd;
     int poolSize;
-    int model;
-    int auth;
+    int needAuth;
     int daemon;
     volatile int index;
     volatile int maxConnCount;
@@ -483,8 +479,9 @@ void* handleConnByWS(void *args) {
         goto quit;
     }
     
-    int auth = 0;
-    if(server.auth == 1 && server.config.accounts && strcmp(server.config.accounts, "")) {
+    int auth = 1;
+    if(server.needAuth == 1 && server.config.accounts && strcmp(server.config.accounts, "")) {
+        auth = 0;
         cJSON *userName = cJSON_GetObjectItem(json, "UserName");
         cJSON *password = cJSON_GetObjectItem(json, "password");
         char *account;
@@ -514,28 +511,19 @@ void* handleConnByWS(void *args) {
         conn->remotefd = connectToRemote(host, port);
         if (conn->remotefd < 0) {
             printf("failed to connect remote server(%s:%s).\n", host, port);
+            goto quit;
         } else {
             pthread_t tid;
             pthread_create(&tid, NULL, __pipeForLocal, (void*)conn);
             pipeForRemote(conn->localfd, conn->remotefd);
+            if(pthread_cond_wait(&conn->finCond, &conn->finMutex)) {
+                printf("pipe will be closed.\n");
+            }
         }
-    }
-
+    } else {
 quit:
-    closeConn(conn->localfd);
-    return 0;
-}
-
-//TODO
-void* handleConnBySS(void *args) {
-    char buff[DEFAULT_BUFF_SIZE];
-    struct conn* conn = (struct conn*)args;
-    conn->fin = 0;
-    pthread_mutex_init(&conn->finMutex, NULL);
-    pthread_cond_init(&conn->finCond, NULL);
-    
-    // int n = (int)recv(conn->localfd, buff, sizeof(buff), 0);
-    
+        closeConn(conn->localfd);
+    }
     return 0;
 }
 
@@ -650,14 +638,14 @@ void initOptions(int argc, char *argv[]) {
     server.addr.sin_family = AF_INET;
     server.addr.sin_port = htons(DEFAULT_PORT);
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.auth = 0;
+    server.needAuth = 0;
     server.daemon = 0;
     while ((c = getopt(argc, argv, "p:l:m:c:hd")) != -1) {
         switch(c) {
             case 'c':
                 if(!parseConfig(optarg, initConfig)) {
                     if(server.config.accounts) {
-                        server.auth = 1;
+                        server.needAuth = 1;
                     }
                     
                     if(server.config.address) {
@@ -705,7 +693,7 @@ int main(int argc, char *argv[]) {
     
     
     if(server.daemon == 1) {
-        background();
+        // background();
     }
     
     server.poolSize = 20;
@@ -713,7 +701,6 @@ int main(int argc, char *argv[]) {
     server.maxConnCount = 1000;
     server.index = 0;
     server.pid = getpid();
-    server.model = PROXY_MODEL_WS;
     server.sinalHandler = waitSignal;
 #ifdef M_WORKER
     // TODO
