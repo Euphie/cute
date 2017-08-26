@@ -1,4 +1,4 @@
-## Cute [![](https://img.shields.io/badge/building-passing-green.svg)](http://euphie.me) [![](https://img.shields.io/badge/version-v0.7-yellow.svg)](http://euphie.me) [![](https://img.shields.io/badge/beta-yes-red.svg)](http://euphie.me)
+## Cute [![](https://img.shields.io/badge/building-passing-green.svg)](http://euphie.me) [![](https://img.shields.io/badge/version-v0.7.1-yellow.svg)](http://euphie.me) [![](https://img.shields.io/badge/beta-yes-red.svg)](http://euphie.me)
 
 ## Description
 
