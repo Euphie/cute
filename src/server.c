@@ -53,7 +53,6 @@ typedef struct cuteServer {
     volatile int maxConnCount;
     volatile int currConnCount;
     pthread_t *tids;
-    pthread_mutex_t accpetMutex;
     pthread_mutex_t connMutex;
     pthread_cond_t connEmptyCond;
     pthread_cond_t connFullCond;
@@ -461,11 +460,9 @@ void* handleConnByWS(void *args) {
     
     printf("current fd:%d in handleConnByWS\n", conn->localfd);
     
-    pthread_mutex_lock(&server.accpetMutex);
     if(shakeHand(conn->localfd) <= 0) {
         goto quit;
     }
-    pthread_mutex_unlock(&server.accpetMutex);
     
     memset(buff, 0, sizeof(buff));
     int len = getRequest(conn->localfd, buff);
@@ -712,7 +709,6 @@ int main(int argc, char *argv[]) {
 #endif
     server.tids = (pthread_t *)malloc(sizeof(pthread_t) * server.poolSize);
     server.pool = (struct conn *)malloc(sizeof(struct conn) * server.poolSize);
-    pthread_mutex_init(&server.accpetMutex, NULL);
     pthread_mutex_init(&server.connMutex, NULL);
     pthread_cond_init(&server.connEmptyCond, NULL);
     pthread_cond_init(&server.connFullCond, NULL);
