@@ -16,6 +16,7 @@ install:
 	chmod +x /etc/init.d/$(project)d
 	chkconfig --add $(project)d
 uninstall:
+    service $(project)d stop
 	chkconfig --del $(project)d
 	rm -f /etc/init.d/$(project)d
 	rm -f /etc/$(project).ini
