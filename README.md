@@ -58,7 +58,7 @@ example: bin/cute-client-osx -s 119.88.88.88 -p 9999 -k 123456 -u cute
 
 ## Installation
 
-In linux, you can register cute as service, but must be run as root.
+In linux, you can register cute as service, but must be run as root. And the configuration file is in /etc/cute.ini.
 ```
 git clone https://github.com/Euphie/cute.git
 cd src
