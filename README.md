@@ -10,23 +10,18 @@ A simple proxy server with websocket.
 2. High performance.
 3. Simple to use.
 
-## Installation
-
-On Linux compile the software using "make" or "make install". 
-```
-git clone https://github.com/Euphie/cute.git
-cd src
-make install
-cd ..
-bin/cute -c config/cute.ini 
-```
-
 ## Basic usage
 
 * Cute Server
 
-Command line syntax goes as follows:
+You can use cute server as follows:
 ```
+git clone https://github.com/Euphie/cute.git
+cd src
+make
+cd ..
+bin/cute -c config/cute.ini 
+
 usage: bin/cute options
   [-l address]
   [-p port]
@@ -55,6 +50,22 @@ usage: bin/cute-client-xxx options
   
 example: bin/cute-client-osx -s 119.88.88.88 -p 9999 -k 123456 -u cute
 ```
+
+## Installation
+
+In linux, you can register cute as service, but must be run as root.
+```
+git clone https://github.com/Euphie/cute.git
+cd src
+make && make install
+service cuted start
+```
+
+You can also uninstall the service.
+```
+make uninstall
+```
+
 
 ## Communication
 
