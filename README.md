@@ -10,18 +10,23 @@ A simple proxy server with websocket.
 2. High performance.
 3. Simple to use.
 
-## Basic usage
+## Compile
 
-* Cute Server
-
-You can use cute server as follows:
+Easy to compile:
 ```
 git clone https://github.com/Euphie/cute.git
 cd src
 make
 cd ..
 bin/cute -c config/cute.ini 
+```
 
+## Basic usage
+
+* Cute Server
+
+You can use cute server as follows:
+```
 usage: bin/cute options
   [-l address]
   [-p port]
