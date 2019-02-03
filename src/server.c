@@ -660,6 +660,10 @@ void initOptions(int argc, char *argv[]) {
                     exit(1);
                 }
                 break;
+            case 'a':
+                server.needAuth = 1;
+                server.config.accounts = optarg;
+                break;
             case 'p':
                 server.addr.sin_port = htons(atoi(optarg));
                 break;
