@@ -485,7 +485,7 @@ void* handleConnByWS(void *args) {
         char *account;
         char *savePtr;
         accounts = strdup(server.config.accounts);
-        account = strtok_r(accounts, ";", &savePtr);
+        account = strtok_r(accounts, " ", &savePtr);
         while(account != NULL){
             char* temp = join(join(userName->valuestring, ":"), password->valuestring);
             if(strcmp(temp, account) == 0) {
