@@ -485,7 +485,7 @@ void* handleConnByWS(void *args) {
         char *account;
         char *savePtr;
         accounts = strdup(server.config.accounts);
-        account = strtok_r(accounts, " ", &savePtr);
+        account = strtok_r(accounts, ";", &savePtr);
         while(account != NULL){
             char* temp = join(join(userName->valuestring, ":"), password->valuestring);
             if(strcmp(temp, account) == 0) {
@@ -640,7 +640,7 @@ void initOptions(int argc, char *argv[]) {
     server.addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server.needAuth = 0;
     server.daemon = 0;
-    while ((c = getopt(argc, argv, "p:l:m:c:hd")) != -1) {
+    while ((c = getopt(argc, argv, "a:p:l:m:c:hd")) != -1) {
         switch(c) {
             case 'c':
                 if(!parseConfig(optarg, initConfig)) {
