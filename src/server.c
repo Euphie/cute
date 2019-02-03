@@ -670,7 +670,7 @@ void initOptions(int argc, char *argv[]) {
                 server.daemon = 1;
                 break;
             case 'h':
-                printf("usage: cute [-l address] [-p port] [-h help] [-d daemon]\n");
+                printf("usage: cute [-l address] [-p port] [-h help] [-d daemon] [-c config]\n");
                 exit(0);
         }
     }
