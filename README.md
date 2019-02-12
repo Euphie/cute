@@ -32,6 +32,7 @@ usage: bin/cute options
   [-p port]
   [-d daemon]
   [-c config file]
+  [-a accounts]
   [-h help]
   
 example: bin/cute -p 9999 -d -c config/cute.ini
