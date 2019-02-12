@@ -1,0 +1,9 @@
+version: '3'
+services:
+  cute:
+    image: cute
+    container_name: cute
+    ports:
+      - 7777:7777
+    environment:
+      - CUTE_ACCOUTS=cute:123456
