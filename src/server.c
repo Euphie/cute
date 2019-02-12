@@ -230,10 +230,11 @@ int shakeHand(int fd) {
     }
     
     memset(responseHeader, '\0', DEFAULT_BUFF_SIZE);
-    sprintf(responseHeader, "HTTP/1.1 101 Switching Protocols\r\n");
-    sprintf(responseHeader, "%sUpgrade: websocket\r\n", responseHeader);
-    sprintf(responseHeader, "%sConnection: Upgrade\r\n", responseHeader);
-    sprintf(responseHeader, "%sSec-WebSocket-Accept: %s\r\n\r\n", responseHeader, acceptKey);
+    // sprintf(responseHeader, "HTTP/1.1 101 Switching Protocols\r\n");
+    // sprintf(responseHeader, "%sUpgrade: websocket\r\n", responseHeader);
+    // sprintf(responseHeader, "%sConnection: Upgrade\r\n", responseHeader);
+    // sprintf(responseHeader, "%sSec-WebSocket-Accept: %s\r\n\r\n", responseHeader, acceptKey);
+    sprintf(responseHeader, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", acceptKey);
     
     return (int)write(fd, responseHeader, strlen(responseHeader));
 }
